@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="Logo.png" alt="Munin Logo" width="120" />
+  <img src="assets/Logo.png" alt="Munin Logo" width="120" />
 
   <h1>Munin</h1>
 
