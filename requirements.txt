@@ -1,0 +1,29 @@
+# Munin — Network Reconnaissance & Threat Analysis Framework
+# Requirements v2.x
+
+# ── Core scanning ──────────────────────────────────────────────────────────────
+python-nmap>=0.7.1
+scapy>=2.5.0
+requests>=2.31.0
+mac-vendor-lookup>=0.1.12
+
+# ── Terminal UI ────────────────────────────────────────────────────────────────
+rich>=13.7.0
+
+# ── Web dashboard ─────────────────────────────────────────────────────────────
+flask>=3.0.0
+flask-session>=0.6.0
+bcrypt>=4.1.0
+
+# ── ML / anomaly detection ─────────────────────────────────────────────────────
+scikit-learn>=1.4.0
+numpy>=1.26.0
+
+# ── PDF report generation ─────────────────────────────────────────────────────
+weasyprint>=62.0
+
+# ── Compliance mapping (optional) ─────────────────────────────────────────────
+# No extra deps — pure Python dicts
+
+# ── Extras ────────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
