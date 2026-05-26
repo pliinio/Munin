@@ -82,7 +82,7 @@ from scanner.analysis.asset_criticality   import enrich_host_with_criticality
 
 console = Console()
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 BANNER = r"""
 [bold cyan]
@@ -92,7 +92,7 @@ BANNER = r"""
   ██║╚██╔╝██║██║   ██║██║╚██╗██║██║██║╚██╗██║
   ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║██║ ╚████║
   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝
-[/bold cyan][dim]  Network Reconnaissance & Vulnerability Assessment Framework[/dim]
+[/bold cyan][dim]  Cyber Risk Intelligence Platform[/dim]
 [dim]  v{version}  --  Use only on networks you own or have explicit permission to audit[/dim]
 """
 
