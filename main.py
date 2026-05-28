@@ -82,7 +82,7 @@ from scanner.analysis.asset_criticality   import enrich_host_with_criticality
 
 console = Console()
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 BANNER = r"""
 [bold cyan]
