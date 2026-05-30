@@ -33,7 +33,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-HISTORY_DIR = Path("data/history")
+# Resolve relative to project root (parent of this file's package)
+# This ensures history is always saved in <project>/data/history/
+# regardless of from where Python is invoked.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+HISTORY_DIR   = _PROJECT_ROOT / "data" / "history"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
