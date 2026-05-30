@@ -101,7 +101,7 @@ nano .env
 
 Altere obrigatoriamente:
 ```env
-MUNIN_DASHBOARD_PASS=suasenhaforte   # troque isso antes de usar
+MUNIN_DASHBOARD_PASS=changeme   # troque isso antes de usar
 ```
 
 ---
@@ -191,6 +191,8 @@ Na primeira vez, você verá o banner do Munin e o prompt interativo:
 munin >
 ```
 
+> As teclas ↑ ↓ navegam pelo histórico de comandos e ← → movem o cursor dentro da linha, como em um terminal normal.
+
 ### Comandos de scan
 
 ```bash
@@ -203,6 +205,8 @@ munin > scan host 192.168.1.10
 # Apenas descoberta ARP (quais IPs estão ativos)
 munin > discover 192.168.1.0/24
 ```
+
+Ao final de cada scan, o Munin salva o resultado automaticamente em `scans/` e pergunta se deseja gerar o relatório GRC e o PDF.
 
 ### Análise de logs
 
@@ -233,9 +237,6 @@ munin > history
 ### Exportações
 
 ```bash
-# Relatório HTML interativo
-munin > export html
-
 # Relatório PDF executivo
 munin > export pdf
 
@@ -246,6 +247,15 @@ munin > export report
 munin > export siem
 munin > export siem elastic
 munin > export siem webhook
+```
+
+### Carregar scan salvo
+
+```bash
+# Carrega um resultado JSON e exibe o relatório
+munin > load scans/munin_20260518_120000.json
+
+# O Munin também sugere os arquivos disponíveis se o nome estiver errado
 ```
 
 ### Configurações de sessão
@@ -260,9 +270,6 @@ munin > set audience board
 # Ativar/desativar ajuste de risco por criticidade do ativo
 munin > set criticality on
 
-# Ativar/desativar push automático para SIEM após cada scan
-munin > set siem on
-
 # Ativar/desativar lookup de CVEs no NVD
 munin > set cve on
 
@@ -276,9 +283,6 @@ munin > show settings
 ### Outros comandos
 
 ```bash
-# Carregar um resultado JSON salvo anteriormente
-munin > load scans/munin_20260518_120000.json
-
 # Ver versão e status do Ollama
 munin > version
 
@@ -321,6 +325,8 @@ source .venv/bin/activate
 python3 dashboard.py
 ```
 
+> Se você rodar `python3 dashboard.py` sem ativar o venv e o Flask não for encontrado, o Munin detecta isso automaticamente e se re-executa com o Python do venv.
+
 Acesse em `http://127.0.0.1:5000` e faça login com as credenciais do `.env`.
 
 ### Funcionalidades
@@ -347,7 +353,7 @@ Acesse em `http://127.0.0.1:5000` e faça login com as credenciais do `.env`.
 
 ## Relatórios NLP com Ollama
 
-O Munin gera relatórios em linguagem natural usando um modelo de IA rodando localmente (sem enviar dados para a nuvem).
+O Munin gera relatórios em linguagem natural usando um modelo de IA rodando localmente, sem enviar dados para a nuvem. Os relatórios são específicos para cada host — mencionam os serviços reais encontrados, os CVEs presentes e as ameaças detectadas naquele scan.
 
 ### Instalando o Ollama
 
@@ -370,7 +376,7 @@ ollama serve
 # Verificar se o Ollama está disponível
 munin > version
 
-# Definir audiência e gerar relatório
+# Definir audiência e gerar relatório após um scan
 munin > set audience board
 munin > export report
 ```
@@ -382,6 +388,8 @@ munin > export report
 | `manager` | Técnica acessível | Ações práticas e prazos |
 | `auditor` | Compliance | Controles violados, evidências, referências legais |
 | `board` | Executiva | Impacto no negócio, risco financeiro, sem jargão |
+
+Quando o Ollama não está disponível, o Munin usa um template contextualizado com os dados reais do scan como fallback.
 
 ---
 
@@ -399,7 +407,6 @@ MUNIN_SIEM_WEBHOOK_URL=https://hooks.exemplo.com/munin
 # No CLI do Munin:
 munin > export siem           # envia para todos configurados
 munin > export siem elastic   # envia só para Elastic
-munin > set siem on           # auto-push após cada scan
 ```
 
 Conectores disponíveis: `elastic` · `splunk` · `graylog` · `syslog` · `webhook`
@@ -443,12 +450,12 @@ munin/
 │
 ├── report/
 │   ├── terminal.py                  # Output Rich no terminal
-│   ├── html_report.py               # Relatório HTML interativo
 │   ├── pdf_report.py                # Relatório PDF executivo (WeasyPrint)
 │   └── history.py                   # Histórico e trend analysis
 │
+├── scans/                           # JSONs salvos automaticamente após cada scan
 └── data/
-    └── history/                     # Snapshots de scans anteriores
+    └── history/                     # Snapshots para trend analysis
 ```
 
 ---
@@ -485,22 +492,49 @@ Ou ative o venv manualmente antes de qualquer comando Python:
 source .venv/bin/activate
 ```
 
+### `run_dashboard.sh` não encontrado
+
+O arquivo é gerado pelo `setup.sh`. Se não existir, rode o setup novamente ou crie manualmente:
+```bash
+echo -e '#!/usr/bin/env bash\ncd "$(dirname "$0")"\nexec .venv/bin/python dashboard.py "$@"' > run_dashboard.sh
+chmod +x run_dashboard.sh
+```
+
 ### `.env.example` não encontrado
 
 ```bash
-# O arquivo existe mas começa com ponto (oculto no Linux)
+# O arquivo começa com ponto — é oculto no Linux
 ls -la | grep env
 
-# Se não estiver lá, recrie a partir do .env gerado pelo setup
+# Se não existir, recrie a partir do .env gerado pelo setup
 cp .env .env.example
+```
+
+### `No module named 'flask'` no dashboard
+
+O dashboard detecta isso automaticamente e tenta re-executar com o Python do venv. Se ainda assim falhar:
+```bash
+# Confirme que o venv existe
+ls .venv/bin/python
+
+# Use o script correto
+bash run_dashboard.sh
+
+# Ou instale manualmente no venv
+.venv/bin/pip install flask
+```
+
+### Dashboard não abre — `No JSON file found`
+
+O dashboard procura o scan mais recente em `scans/`. Rode um scan antes, ou passe o arquivo explicitamente:
+```bash
+bash run_dashboard.sh scans/munin_20260529_102738.json
 ```
 
 ### Porta 5000 já em uso
 
 ```bash
 bash run_dashboard.sh --port 8080
-# ou
-source .venv/bin/activate && python3 dashboard.py --port 8080
 ```
 
 ### Nmap não encontrado
@@ -546,6 +580,13 @@ python3 -c "from weasyprint import HTML; HTML(string='<h1>ok</h1>').write_pdf('/
 ```
 
 Se não funcionar, o Munin gera automaticamente um `.html` como fallback.
+
+### `history` não mostra scans
+
+Os snapshots de histórico são criados automaticamente quando um scan é concluído e o JSON é salvo em `scans/`. Se você tiver JSONs antigos salvos na raiz do projeto (antes da v2.0.3), carregue-os com `load` para registrá-los no histórico:
+```bash
+munin > load munin_20260529_102738.json
+```
 
 ---
 
