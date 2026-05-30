@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="License: AGPL-3.0"/>
     <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey?style=flat-square" alt="Platform"/>
     <img src="https://img.shields.io/badge/requires-root%20%2F%20sudo-critical?style=flat-square" alt="Requires root"/>
-    <img src="https://img.shields.io/badge/version-2.0.2-brightgreen?style=flat-square" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-2.0.3-brightgreen?style=flat-square" alt="Version"/>
   </p>
 
   <p><em>"O diferencial do Munin não é detectar vulnerabilidades.<br>É explicar, priorizar e contextualizar riscos de forma compreensível para humanos."</em></p>
