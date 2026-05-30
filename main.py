@@ -66,7 +66,6 @@ from scanner.analysis.risk_engine import (
     full_report,                  # ← v2: NLP business report
 )
 from report.terminal    import print_all
-from report.html_report import generate as generate_html
 
 from scanner.analysis.compliance_mapper   import (
     compliance_score,
@@ -82,7 +81,7 @@ from scanner.analysis.asset_criticality   import enrich_host_with_criticality
 
 console = Console()
 
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 
 BANNER = r"""
 [bold cyan]
@@ -92,85 +91,73 @@ BANNER = r"""
   ██║╚██╔╝██║██║   ██║██║╚██╗██║██║██║╚██╗██║
   ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║██║ ╚████║
   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝
-[/bold cyan][dim]  Cyber Risk Intelligence Platform[/dim]
+[/bold cyan][dim]  Network Reconnaissance & Vulnerability Assessment Framework[/dim]
 [dim]  v{version}  --  Use only on networks you own or have explicit permission to audit[/dim]
 """
 
 HELP_TEXT = """\
-[bold cyan]Core commands[/bold cyan]
+[bold cyan]Scan[/bold cyan]
 
-  [cyan]scan net[/cyan] [white]<CIDR>[/white]             Full pipeline: discovery, OS, ports, CVEs
-                              Example: scan net 192.168.1.0/24
+  [cyan]scan net[/cyan] [white]<CIDR>[/white]             Scan completo: descoberta, OS, portas, CVEs, relatório
+                              Ex: scan net 192.168.1.0/24
 
-  [cyan]scan host[/cyan] [white]<IP>[/white]              Port scan + CVE lookup on a single host
-                              Example: scan host 192.168.1.105
+  [cyan]scan host[/cyan] [white]<IP>[/white]              Scan de um host único
+                              Ex: scan host 192.168.1.105
 
-  [cyan]discover[/cyan] [white]<CIDR>[/white]             ARP scan only — list live IPs and MACs
-                              Example: discover 192.168.1.0/24
+  [cyan]discover[/cyan] [white]<CIDR>[/white]             Apenas descoberta ARP — lista IPs e MACs
+                              Ex: discover 192.168.1.0/24
 
-[bold cyan]Log analysis[/bold cyan]
+[bold cyan]Análise[/bold cyan]
 
-  [cyan]readlog[/cyan] [white]<path>[/white]              Parse a system log file and display a table
-                              Supports: syslog, auth.log, access.log, kern.log, custom
-                              Example: readlog /var/log/syslog
-                              Example: readlog /var/log/nginx/access.log
+  [cyan]readlog[/cyan] [white]<path>[/white]              Analisa um arquivo de log e detecta ameaças
+                              Ex: readlog /var/log/auth.log
 
-[bold cyan]Settings[/bold cyan]
+  [cyan]correlate[/cyan] [white]<IP> <logpath>[/white]   Combina log com host já escaneado
+                              Ex: correlate 192.168.1.10 /var/log/auth.log
 
-  [cyan]set profile[/cyan] [white]<name>[/white]          Scan profile: quick | normal | full | stealth
-  [cyan]set cve[/cyan] [white]<on|off>[/white]            Enable/disable NVD CVE lookup
-  [cyan]set nse[/cyan] [white]<on|off>[/white]            Enable/disable NSE vulnerability scripts
-  [cyan]set audience[/cyan] [white]<name>[/white]         NLP report audience: manager | auditor | board
-  [cyan]show settings[/cyan]               Print current settings
+  [cyan]compliance[/cyan]                  Postura de compliance (ISO 27001 / NIST / CIS / LGPD)
+  [cyan]remediation[/cyan]                 Plano de remediação priorizado
+  [cyan]assets[/cyan]                      Classificação de criticidade dos ativos
+  [cyan]history[/cyan]                     Histórico de scans e tendências
 
-[bold cyan]Reports[/bold cyan]
+[bold cyan]Exportação[/bold cyan]
 
-  [cyan]load[/cyan] [white]<json_path>[/white]            Load a saved JSON result and regenerate reports
-  [cyan]export html[/cyan]                 Generate HTML report from the last scan result
-  [cyan]export report[/cyan]               Generate plain-language business report from last scan
+  [cyan]load[/cyan] [white]<json_path>[/white]            Carrega resultado JSON salvo e exibe relatório
+                              Ex: load scans/munin_20260529_102738.json
 
-[bold cyan]General[/bold cyan]
+  [cyan]export report[/cyan]               Relatório GRC em linguagem natural (manager/auditor/board)
+  [cyan]export pdf[/cyan]                  Relatório PDF executivo
+  [cyan]export siem[/cyan] [white][connector][/white]  Push para SIEM (elastic|splunk|graylog|syslog|webhook|auto)
 
-  [cyan]help[/cyan]                        Show this help
-  [cyan]version[/cyan]                     Show version info
-  [cyan]clear[/cyan]                       Clear the terminal screen
-  [cyan]exit[/cyan] / [cyan]quit[/cyan]                 Exit Munin
+[bold cyan]Configurações[/bold cyan]
 
-[bold cyan]v2 commands[/bold cyan]
+  [cyan]set profile[/cyan] [white]<nome>[/white]          Perfil: quick | normal | full | stealth
+  [cyan]set cve[/cyan] [white]<on|off>[/white]            Ativa/desativa lookup de CVEs
+  [cyan]set nse[/cyan] [white]<on|off>[/white]            Ativa/desativa scripts NSE
+  [cyan]set audience[/cyan] [white]<nome>[/white]         Audiência NLP: manager | auditor | board
+  [cyan]set criticality[/cyan] [white]<on|off>[/white]    Ativa/desativa ajuste de risco por criticidade do ativo
+  [cyan]show settings[/cyan]               Mostra configurações atuais
 
-  [cyan]compliance[/cyan]                  Show compliance posture (ISO 27001 / NIST / CIS / LGPD)
-  [cyan]remediation[/cyan]                 Show prioritized remediation plan
-  [cyan]history[/cyan]                     Show scan history and trend summary
-  [cyan]export pdf[/cyan]                  Generate PDF executive report
-  [cyan]export siem[/cyan] [white][connector][/white]  Push to SIEM (elastic|splunk|graylog|syslog|webhook|auto)
-  [cyan]set criticality[/cyan] [white]<on|off>[/white]  Enable/disable asset criticality scoring
+[bold cyan]Geral[/bold cyan]
 
+  [cyan]help[/cyan]                        Este menu
+  [cyan]version[/cyan]                     Versão e status do Ollama
+  [cyan]clear[/cyan]                       Limpa a tela
+  [cyan]exit[/cyan] / [cyan]quit[/cyan]               Sair
 
-[bold cyan]Scan profiles[/bold cyan]
+[bold cyan]Perfis de scan[/bold cyan]
 
-  quick    Top 1 000 ports, T4 (fast, ~1 min/host)
-  normal   Top 10 000 ports + default scripts, T4 (recommended)
-  full     All 65 535 ports + version detection, T4 (thorough)
-  stealth  All ports, low rate T2 (slow, quiet)
+  quick    Top 1.000 portas, T4 (~1 min/host)
+  normal   Top 10.000 portas + scripts, T4 (recomendado)
+  full     Todas 65.535 portas + versões, T4 (completo)
+  stealth  Todas as portas, rate baixo T2 (lento, silencioso)
 
-[bold cyan]Threat analysis[/bold cyan]
+[bold cyan]Níveis de risco[/bold cyan]
 
-  correlate [white]<IP> <logpath>[/white]  Attach a log file to a scanned host and re-run
-                              full threat correlation
-                              Example: correlate 192.168.1.10 /var/log/auth.log
-
-[bold cyan]Risk levels[/bold cyan]
-
-  0–20   LOW       Minimal exposure, low urgency
-  21–50  MEDIUM    Notable risks, schedule remediation
-  51–80  HIGH      Serious exposure, act soon
-  81–100 CRITICAL  Immediate action required
-
-[bold cyan]NLP report audiences[/bold cyan]
-
-  manager  Plain language for IT coordinators and department heads (default)
-  auditor  Compliance-oriented for ISO 27001 / LGPD auditors
-  board    Executive summary for C-suite and board of directors
+  0–20   LOW       Exposição mínima
+  21–50  MEDIUM    Riscos notáveis, agendar remediação
+  51–80  HIGH      Exposição séria, agir em breve
+  81–100 CRITICAL  Ação imediata necessária
 """
 
 
@@ -195,19 +182,21 @@ def check_root() -> bool:
 
 class Settings:
     def __init__(self):
-        self.profile  = "normal"
-        self.do_cve   = True
-        self.do_nse   = True
-        self.audience = "manager"   # ← v2: NLP audience
+        self.profile         = "normal"
+        self.do_cve          = True
+        self.do_nse          = True
+        self.audience        = "manager"   # NLP audience
+        self.do_criticality  = True        # asset criticality adjustment
 
     def show(self):
         t = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
-        t.add_column("key",   style="dim",   width=18)
+        t.add_column("key",   style="dim",   width=20)
         t.add_column("value", style="white")
-        t.add_row("scan profile", f"[cyan]{self.profile}[/cyan]")
-        t.add_row("cve lookup",   "[green]on[/green]" if self.do_cve else "[red]off[/red]")
-        t.add_row("nse scripts",  "[green]on[/green]" if self.do_nse else "[red]off[/red]")
-        t.add_row("nlp audience", f"[cyan]{self.audience}[/cyan]")
+        t.add_row("scan profile",      f"[cyan]{self.profile}[/cyan]")
+        t.add_row("cve lookup",        "[green]on[/green]" if self.do_cve         else "[red]off[/red]")
+        t.add_row("nse scripts",       "[green]on[/green]" if self.do_nse         else "[red]off[/red]")
+        t.add_row("asset criticality", "[green]on[/green]" if self.do_criticality else "[red]off[/red]")
+        t.add_row("nlp audience",      f"[cyan]{self.audience}[/cyan]")
         console.print()
         console.print(t)
 
@@ -218,7 +207,8 @@ class Settings:
 
 def _scan_single_host(ip: str, profile: str, do_cve: bool, do_nse: bool,
                       log_entries: list | None = None,
-                      audience: str = "manager") -> dict:
+                      audience: str = "manager",
+                      do_criticality: bool = True) -> dict:
     host: dict = {
         "ip": ip, "mac": "N/A", "mac_vendor": "Unknown",
         "hostname": "N/A", "os": {}, "ports": [],
@@ -278,10 +268,11 @@ def _scan_single_host(ip: str, profile: str, do_cve: bool, do_nse: bool,
             pass
 
     # ── v2: Asset criticality (adjusts risk score) ────────────────────────────
-    try:
-        enrich_host_with_criticality(host)
-    except Exception:
-        pass
+    if do_criticality:
+        try:
+            enrich_host_with_criticality(host)
+        except Exception:
+            pass
 
     # ── v2: NLP business report ──────────────────────────────────────────────
     with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
@@ -304,7 +295,8 @@ def _scan_single_host(ip: str, profile: str, do_cve: bool, do_nse: bool,
 
 
 def run_full_network_scan(target: str, profile: str, do_cve: bool, do_nse: bool,
-                          audience: str = "manager") -> dict:
+                          audience: str = "manager",
+                          do_criticality: bool = True) -> dict:
     start = time.time()
     result: dict = {
         "meta": {
@@ -339,7 +331,8 @@ def run_full_network_scan(target: str, profile: str, do_cve: bool, do_nse: bool,
         for entry in discovered:
             ip  = entry["ip"]
             mac = entry.get("mac", "N/A")
-            host = _scan_single_host(ip, profile, do_cve, do_nse, all_hosts=result["hosts"], audience=audience)
+            host = _scan_single_host(ip, profile, do_cve, do_nse,
+                                        audience=audience, do_criticality=do_criticality)
             host["mac"]        = mac
             host["mac_vendor"] = get_mac_vendor(mac)
             result["hosts"].append(host)
@@ -350,12 +343,14 @@ def run_full_network_scan(target: str, profile: str, do_cve: bool, do_nse: bool,
 
 
 def run_single_host_scan(ip: str, profile: str, do_cve: bool, do_nse: bool,
-                         audience: str = "manager") -> dict:
+                         audience: str = "manager",
+                         do_criticality: bool = True) -> dict:
     start = time.time()
     console.print()
     console.rule(f"[cyan]Scanning {ip}[/cyan]")
 
-    host = _scan_single_host(ip, profile, do_cve, do_nse, audience=audience)
+    host = _scan_single_host(ip, profile, do_cve, do_nse,
+                             audience=audience, do_criticality=do_criticality)
 
     result: dict = {
         "meta": {
@@ -436,19 +431,16 @@ def run_discovery_only(target: str) -> dict:
 
 def _save_json(result: dict) -> Path:
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = Path(f"munin_{ts}.json")
+    Path("scans").mkdir(exist_ok=True)
+    path = Path(f"scans/munin_{ts}.json")
     path.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    # Save history snapshot every time a JSON is saved
+    try:
+        from report.history import save_snapshot
+        save_snapshot(result)
+    except Exception:
+        pass
     return path
-
-
-def _save_html(result: dict, suffix: str = "") -> str:
-    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"munin_{suffix + '_' if suffix else ''}{ts}.html"
-    with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
-                  console=console, transient=True) as prog:
-        prog.add_task("Generating HTML report...")
-        out = generate_html(result, name)
-    return out
 
 
 def _print_business_reports(result: dict, audience: str = "manager") -> None:
@@ -608,7 +600,11 @@ def save_and_report(result: dict, s: "Settings") -> None:
     console.rule("[cyan]Results[/cyan]")
     print_all(result)
 
-    # ── v2: NLP business report ──────────────────────────────────────────────
+    # Always save JSON and history snapshot automatically
+    p = _save_json(result)
+    console.print(f"[green]  JSON saved: {p.resolve()}[/green]")
+
+    # ── NLP business report ──────────────────────────────────────────────────
     ans_nlp = _ask("Generate plain-language business report? [y/N]: ").strip().lower()
     if ans_nlp in ("y", "yes"):
         audience_input = _ask(
@@ -626,17 +622,23 @@ def save_and_report(result: dict, s: "Settings") -> None:
             p = _save_business_report_md(result, audience)
             console.print(f"[green]  Markdown saved: {p.resolve()}[/green]")
 
-    # ── Original post-scan options (unchanged) ───────────────────────────────
-    ans = _ask("Save raw JSON result? [y/N]: ").strip().lower()
-    if ans in ("y", "yes"):
-        p = _save_json(result)
-        console.print(f"[green]  JSON saved: {p.resolve()}[/green]")
-
-    ans = _ask("Generate interactive HTML report? [y/N]: ").strip().lower()
-    if ans in ("y", "yes"):
-        out = _save_html(result)
-        console.print(f"[green]  HTML saved: {out}[/green]")
-        console.print(f"  Open in browser:  xdg-open {out}")
+    # ── PDF report ───────────────────────────────────────────────────────────
+    ans_pdf = _ask("Generate PDF executive report? [y/N]: ").strip().lower()
+    if ans_pdf in ("y", "yes"):
+        try:
+            from report.pdf_report import generate_pdf
+            from scanner.analysis.compliance_mapper import environment_compliance_score
+            import datetime as _dt
+            hosts  = result.get("hosts", [])
+            env_cs = environment_compliance_score(hosts)
+            ts     = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_p  = f"reports/munin_report_{s.audience}_{ts}.pdf"
+            Path("reports").mkdir(exist_ok=True)
+            out = generate_pdf(result, output_path=out_p,
+                               audience=s.audience, env_compliance=env_cs)
+            console.print(f"[green]  PDF saved: {out.resolve()}[/green]")
+        except Exception as exc:
+            console.print(f"[red]  PDF failed: {exc}[/red]")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -919,8 +921,52 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
         else:
             console.print("[red]Usage: set nse <on|off>[/red]")
 
-    # ── set audience <name> ── v2 ─────────────────────────────────────────────
-    elif cmd == "set" and len(parts) >= 3 and parts[1] == "audience":
+    # ── set criticality on|off ── v2 ─────────────────────────────────────────
+    elif cmd == "set" and len(parts) >= 3 and parts[1] == "criticality":
+        val = parts[2].lower()
+        s.do_criticality = val in ("on", "true", "1")
+        state = "on" if s.do_criticality else "off"
+        color = "green" if s.do_criticality else "yellow"
+        console.print(f"[{color}]  asset criticality => {state}[/{color}]")
+
+    # ── assets ── v2 ─────────────────────────────────────────────────────────
+    elif cmd == "assets":
+        if not last_result.get("hosts"):
+            console.print("[yellow]No scan result. Run a scan first.[/yellow]")
+        else:
+            try:
+                from scanner.analysis.asset_criticality import classify_asset, apply_criticality_to_risk
+                hosts = last_result.get("hosts", [])
+                console.print()
+                console.rule("[cyan]Asset Criticality Classification[/cyan]")
+                t = Table(box=box.SIMPLE_HEAD, border_style="dim", header_style="bold cyan", padding=(0,1))
+                t.add_column("IP",           style="cyan", width=16)
+                t.add_column("Asset Type",   width=22)
+                t.add_column("Criticality",  width=12)
+                t.add_column("Confidence",   width=10)
+                t.add_column("Risk Score",   width=12)
+                t.add_column("Reason",       style="dim", width=40)
+                crit_color = {"CRITICAL":"bold red","HIGH":"red","MEDIUM":"yellow","LOW":"green"}
+                for h in sorted(hosts, key=lambda x: x.get("risk_score",0), reverse=True):
+                    ap   = h.get("asset_profile", {})
+                    atype = h.get("asset_type", ap.get("asset_type", "unknown"))
+                    crit  = h.get("asset_criticality", ap.get("criticality", "MEDIUM"))
+                    cc    = crit_color.get(crit, "white")
+                    raw   = h.get("risk_score_raw", h.get("risk_score", 0))
+                    adj   = h.get("risk_score", 0)
+                    score_str = f"{raw}→{adj}" if raw != adj else str(adj)
+                    reason = (ap.get("type_reason") or "heuristic")[:38]
+                    t.add_row(
+                        h.get("ip","?"),
+                        atype,
+                        f"[{cc}]{crit}[/{cc}]",
+                        ap.get("confidence","low"),
+                        score_str,
+                        reason,
+                    )
+                console.print(t)
+            except Exception as exc:
+                console.print(f"[red]  Assets error: {exc}[/red]")
         val = parts[2].lower()
         if val in ("manager", "auditor", "board"):
             s.audience = val
@@ -935,7 +981,8 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
         ans = _ask(f"\nStart full scan on {target}? [y/N]: ").strip().lower()
         if ans in ("y", "yes"):
             last_result = run_full_network_scan(
-                target, s.profile, s.do_cve, s.do_nse, audience=s.audience
+                target, s.profile, s.do_cve, s.do_nse,
+                audience=s.audience, do_criticality=s.do_criticality
             )
             save_and_report(last_result, s)
     elif cmd == "scan" and len(parts) == 2 and parts[1] == "net":
@@ -948,7 +995,8 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
         ans = _ask(f"\nStart scan on {ip}? [y/N]: ").strip().lower()
         if ans in ("y", "yes"):
             last_result = run_single_host_scan(
-                ip, s.profile, s.do_cve, s.do_nse, audience=s.audience
+                ip, s.profile, s.do_cve, s.do_nse,
+                audience=s.audience, do_criticality=s.do_criticality
             )
             save_and_report(last_result, s)
     elif cmd == "scan" and len(parts) == 2 and parts[1] == "host":
@@ -960,11 +1008,6 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
             console.print("[red]Usage: discover <CIDR>  e.g. discover 192.168.1.0/24[/red]")
         else:
             last_result = run_discovery_only(parts[1])
-            if last_result.get("hosts"):
-                ans = _ask("\nGenerate HTML report for discovered hosts? [y/N]: ").strip().lower()
-                if ans in ("y", "yes"):
-                    out = _save_html(last_result, "discovery")
-                    console.print(f"[green]  HTML saved: {out}[/green]")
 
     # ── readlog <path> ───────────────────────────────────────────────────────
     elif cmd == "readlog":
@@ -979,14 +1022,6 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
             console.print("[red]Usage: correlate <IP> <logpath>[/red]")
         else:
             cmd_correlate(parts[1], parts[2], last_result)
-
-    # ── export html ──────────────────────────────────────────────────────────
-    elif cmd == "export" and len(parts) >= 2 and parts[1] == "html":
-        if not last_result.get("hosts"):
-            console.print("[yellow]No scan result in memory. Run a scan first.[/yellow]")
-        else:
-            out = _save_html(last_result)
-            console.print(f"[green]  HTML saved: {out}[/green]")
 
     # ── export report ── v2 ───────────────────────────────────────────────────
     elif cmd == "export" and len(parts) >= 2 and parts[1] == "report":
@@ -1010,22 +1045,32 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     # ── load <json_path> ─────────────────────────────────────────────────────
     elif cmd == "load":
         if len(parts) < 2:
-            console.print("[red]Usage: load <json_path>[/red]")
+            console.print("[red]Usage: load <json_path>  e.g. load scans/munin_20260529.json[/red]")
         else:
-            p = Path(parts[1])
-            if not p.exists():
+            # Try as given, then relative to project dir, then scans/ subdir
+            candidates = [
+                Path(parts[1]),
+                Path(__file__).resolve().parent / parts[1],
+                Path(__file__).resolve().parent / "scans" / Path(parts[1]).name,
+            ]
+            p = next((c for c in candidates if c.exists()), None)
+            if not p:
                 console.print(f"[red]File not found: {parts[1]}[/red]")
+                # Show available scans to help the user
+                scan_dir = Path(__file__).resolve().parent / "scans"
+                if scan_dir.exists():
+                    files = sorted(scan_dir.glob("*.json"), reverse=True)[:5]
+                    if files:
+                        console.print("[dim]  Available scans:[/dim]")
+                        for f in files:
+                            console.print(f"  [cyan]{f.name}[/cyan]")
             else:
                 try:
                     loaded = json.loads(p.read_text())
                     n = len(loaded.get("hosts", []))
-                    console.print(f"[green]  {n} hosts loaded from {parts[1]}[/green]")
+                    console.print(f"[green]  {n} hosts loaded from {p.name}[/green]")
                     print_all(loaded)
                     last_result = loaded
-                    ans = _ask("Generate HTML report? [y/N]: ").strip().lower()
-                    if ans in ("y", "yes"):
-                        out = _save_html(last_result, "loaded")
-                        console.print(f"[green]  HTML saved: {out}[/green]")
                 except Exception as exc:
                     console.print(f"[red]Error loading JSON: {exc}[/red]")
 
@@ -1087,19 +1132,23 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     # ── history ────────────────────────────────────────────────────────────────
     elif cmd == "history":
         try:
-            from report.history import load_snapshots, latest_comparison
+            from report.history import load_snapshots, latest_comparison, HISTORY_DIR
+            # Show where history is stored for debugging
             snaps = load_snapshots(10)
             if not snaps:
-                console.print("[yellow]No history yet. Run more scans.[/yellow]")
+                console.print(
+                    f"[yellow]No history yet. Run a scan — JSON is saved automatically "
+                    f"and history is recorded in {HISTORY_DIR}/[/yellow]"
+                )
             else:
                 console.print()
                 console.rule("[cyan]Scan History[/cyan]")
                 t = Table(box=box.SIMPLE_HEAD, border_style="dim", header_style="bold cyan", padding=(0,1))
-                t.add_column("Scan",    width=18)
-                t.add_column("Target",  width=20)
-                t.add_column("Hosts",   width=7)
-                t.add_column("Avg Risk",width=10)
-                t.add_column("CVEs",    width=7)
+                t.add_column("Scan",     width=18)
+                t.add_column("Target",   width=20)
+                t.add_column("Hosts",    width=7)
+                t.add_column("Avg Risk", width=10)
+                t.add_column("CVEs",     width=7)
                 for s2 in reversed(snaps[-8:]):
                     t.add_row(s2.scan_time[:16], s2.target, str(s2.host_count),
                               f"{s2.avg_risk:.0f}", str(s2.total_cves))
@@ -1108,7 +1157,10 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
                 if comp:
                     dc = "green" if comp.avg_risk_delta < 0 else "red"
                     ds = "↓" if comp.avg_risk_delta < 0 else "↑"
-                    console.print(f"\n  Latest vs previous: avg risk [{dc}]{ds}{abs(comp.avg_risk_delta):.1f}[/{dc}]  {comp.summary}")
+                    console.print(
+                        f"\n  Latest vs previous: avg risk [{dc}]{ds}{abs(comp.avg_risk_delta):.1f}[/{dc}]  "
+                        f"{comp.summary}"
+                    )
         except Exception as exc:
             console.print(f"[red]  History error: {exc}[/red]")
 
@@ -1174,6 +1226,10 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    # ── Change to project directory so all relative paths work ───────────────
+    project_dir = Path(__file__).resolve().parent
+    os.chdir(project_dir)
+
     os.system("clear")
     console.print(BANNER.format(version=VERSION))
     console.print(
@@ -1186,6 +1242,26 @@ def main() -> None:
         if ans not in ("y", "yes"):
             sys.exit(0)
         console.print()
+
+    # ── Enable readline: arrow keys, history, lateral cursor movement ────────
+    try:
+        import readline
+        import atexit
+        hist_file = project_dir / ".munin_history"
+        try:
+            readline.read_history_file(hist_file)
+        except FileNotFoundError:
+            pass
+        readline.set_history_length(500)
+        atexit.register(readline.write_history_file, hist_file)
+        # Tab completion placeholder (noop — keeps readline active)
+        readline.parse_and_bind("tab: complete")
+    except ImportError:
+        pass  # readline not available on Windows
+
+    # ── Create runtime directories ───────────────────────────────────────────
+    for d in ("scans", "reports", "data/history", "baselines"):
+        Path(d).mkdir(parents=True, exist_ok=True)
 
     s           = Settings()
     last_result: dict = {}
