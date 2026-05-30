@@ -10,28 +10,38 @@
 """
 dashboard.py — Flask GRC Dashboard for Munin.
 
-Serves an interactive web report from a saved Munin JSON scan result.
-Targeted at non-technical audiences: managers, auditors, board.
-
 Usage:
-    python3 dashboard.py                          # loads last munin_*.json
-    python3 dashboard.py munin_20260506_120000.json
-    python3 dashboard.py --port 8080
-
-Routes:
-    GET /                → executive dashboard
-    GET /host/<ip>       → host detail page
-    GET /api/summary     → JSON summary for charts
-    GET /api/hosts       → JSON host list
+    python3 dashboard.py                          # loads last scan JSON
+    python3 dashboard.py scans/munin_*.json
+    python3 dashboard.py --port 8080 --host 0.0.0.0
 """
 
 from __future__ import annotations
 
-import json
+import os
 import sys
+from pathlib import Path
+
+# ── Always run from project directory ────────────────────────────────────────
+_PROJECT_DIR = Path(__file__).resolve().parent
+os.chdir(_PROJECT_DIR)
+
+# ── Auto-relaunch inside venv if Flask is not found ──────────────────────────
+# Handles the case where user runs `python3 dashboard.py` without activating venv.
+_VENV_PYTHON = _PROJECT_DIR / ".venv" / "bin" / "python"
+try:
+    import flask  # noqa: F401 — just checking availability
+except ImportError:
+    if _VENV_PYTHON.exists() and Path(sys.executable).resolve() != _VENV_PYTHON.resolve():
+        print(f"[Munin] Flask not found in current Python. Re-launching with venv...")
+        os.execv(str(_VENV_PYTHON), [str(_VENV_PYTHON)] + sys.argv)
+    else:
+        print("[ERROR] Flask not found. Run: pip install flask  (or: sudo bash setup.sh)")
+        sys.exit(1)
+
+import json
 import glob
 import argparse
-from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 from flask import Flask, render_template_string, jsonify, abort
@@ -842,8 +852,12 @@ def _load_result(path: str) -> None:
 
 
 def _find_latest_json() -> Optional[str]:
-    files = sorted(glob.glob("munin_*.json"), reverse=True)
-    return files[0] if files else None
+    """Search for the most recent scan JSON in scans/ and current directory."""
+    candidates = sorted(
+        glob.glob("scans/munin_*.json") + glob.glob("munin_*.json"),
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
 
 
 def main():
@@ -851,23 +865,31 @@ def main():
     parser.add_argument("json_file", nargs="?", help="Path to Munin JSON result")
     parser.add_argument("--port", type=int, default=5000, help="Port (default: 5000)")
     parser.add_argument("--host", default="127.0.0.1", help="Bind host")
+    parser.add_argument("--debug", action="store_true", help="Flask debug mode")
     args = parser.parse_args()
 
     json_path = args.json_file or _find_latest_json()
     if not json_path:
-        print("[ERROR] No JSON file found. Run a scan first or pass the file as argument.")
-        print("Usage:  python3 dashboard.py munin_20260506_120000.json")
+        print("[ERROR] No scan JSON found.")
+        print("        Run a scan first:  sudo bash run_cli.sh")
+        print("        Or pass the file:  python3 dashboard.py scans/munin_20260529_*.json")
         sys.exit(1)
 
     if not Path(json_path).exists():
         print(f"[ERROR] File not found: {json_path}")
+        # Show available scans to help the user
+        available = sorted(glob.glob("scans/munin_*.json"), reverse=True)[:5]
+        if available:
+            print("  Available scans:")
+            for f in available:
+                print(f"    {f}")
         sys.exit(1)
 
     _load_result(json_path)
 
-    print(f"[Munin] Dashboard running at http://{args.host}:{args.port}")
+    print(f"[Munin] Dashboard at http://{args.host}:{args.port}")
     print(f"[Munin] Open in browser: xdg-open http://localhost:{args.port}")
-    app.run(host=args.host, port=args.port, debug=False)
+    app.run(host=args.host, port=args.port, debug=args.debug)
 
 
 if __name__ == "__main__":
