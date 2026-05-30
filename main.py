@@ -91,7 +91,7 @@ BANNER = r"""
   ██║╚██╔╝██║██║   ██║██║╚██╗██║██║██║╚██╗██║
   ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║██║ ╚████║
   ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝
-[/bold cyan][dim]  Network Reconnaissance & Vulnerability Assessment Framework[/dim]
+[/bold cyan][dim]  Cyber Risk Intelligence Platform[/dim]
 [dim]  v{version}  --  Use only on networks you own or have explicit permission to audit[/dim]
 """
 
