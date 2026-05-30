@@ -387,70 +387,103 @@ def _build_prompt(
     level:     str,
 ) -> str:
     """
-    Build the complete prompt for Ollama.
-    Uses a single string (no system/user separation) because most
-    local models respond better to instruction-style prompts.
+    Build a rich, context-specific prompt for Ollama.
+    Sends all relevant scan data so the model can produce a report
+    specific to THIS host — not a generic template.
     """
     persona = _AUDIENCE_PROFILES.get(audience, _AUDIENCE_PROFILES["manager"])
 
-    # Build clean payload — strip raw technical noise
-    ports_summary = []
-    for p in host_data.get("ports", []):
-        if p.get("state") == "open":
-            ports_summary.append({
-                "service":   p.get("name", "unknown"),
-                "version":   p.get("version", ""),
-                "cve_count": len(p.get("cves", [])),
-                "max_cvss":  max(
-                    (float(c.get("cvss_score") or 0) for c in p.get("cves", [])),
-                    default=0,
-                ),
-            })
+    ip       = host_data.get("ip", "unknown")
+    hostname = host_data.get("hostname") or ip
+    os_info  = host_data.get("os", {})
+    os_name  = os_info.get("name", "unknown") if isinstance(os_info, dict) else str(os_info)
 
-    findings_summary = [
-        {
-            "name":        f["name"],
-            "severity":    f["severity"],
-            "description": f.get("description", ""),
+    # Open ports with full detail
+    open_ports = []
+    for p in host_data.get("ports", []):
+        if p.get("state") != "open":
+            continue
+        port_entry = {
+            "port":    p.get("port"),
+            "service": p.get("service", ""),
+            "product": p.get("product", ""),
+            "version": p.get("version", ""),
         }
-        for f in findings
-    ]
+        cves = p.get("cves", [])
+        if cves:
+            top_cve = max(cves, key=lambda c: float(c.get("cvss_score") or 0))
+            port_entry["worst_cve"] = {
+                "id":          top_cve.get("id", ""),
+                "cvss":        top_cve.get("cvss_score"),
+                "severity":    top_cve.get("severity", ""),
+                "description": top_cve.get("description", "")[:200],
+            }
+            port_entry["total_cves"] = len(cves)
+        open_ports.append(port_entry)
+
+    # Findings with full context
+    findings_detail = []
+    for f in findings:
+        findings_detail.append({
+            "threat":      f.get("name", ""),
+            "severity":    f.get("severity", ""),
+            "detail":      f.get("detail", ""),
+            "description": f.get("description", ""),
+        })
+
+    # Asset context
+    asset_type        = host_data.get("asset_type", "unknown")
+    asset_criticality = host_data.get("asset_criticality", "MEDIUM")
 
     scan_data = {
         "host": {
-            "ip":       host_data.get("ip", "unknown"),
-            "hostname": host_data.get("hostname") or "unknown",
-            "os":       host_data.get("os", "unknown"),
+            "ip":               ip,
+            "hostname":         hostname,
+            "operating_system": os_name,
+            "asset_type":       asset_type,
+            "asset_criticality":asset_criticality,
+            "mac_vendor":       host_data.get("mac_vendor", ""),
         },
-        "risk_score":       score,
-        "risk_level":       level,
-        "open_services":    ports_summary,
-        "threats_detected": findings_summary,
+        "risk": {
+            "score": score,
+            "level": level,
+        },
+        "open_ports":       open_ports,
+        "threats_detected": findings_detail,
+        "nse_confirmed_vulnerabilities": list(host_data.get("vulnerabilities", {}).keys()),
     }
+
+    urgency_guidance = {
+        "CRITICAL": "Immediate",
+        "HIGH":     "This week",
+        "MEDIUM":   "This quarter",
+        "LOW":      "Monitor",
+    }.get(level, "This quarter")
 
     return f"""{persona}
 
-You will analyze a network security scan result and write a plain-language report.
+You are analyzing a REAL network security scan of a specific host. Write a report that is SPECIFIC to this exact data — not generic advice.
 
 STRICT RULES:
-- Respond ONLY with a valid JSON object. No text before or after.
-- Do NOT use markdown code blocks or backticks.
-- Do NOT use CVE IDs — describe risks in plain words.
-- Do NOT use port numbers — say "remote access service" instead of "port 22".
-- urgency_label MUST be exactly one of: Immediate, This week, This quarter, Monitor
-- compliance_flags MUST reference LGPD, ISO 27001, or NIST CSF.
-- priority_actions must be concrete and specific, not generic.
+- Respond ONLY with a valid JSON object. No text before or after. No markdown.
+- Be SPECIFIC: mention the actual hostname "{hostname}", actual services found, actual threats detected.
+- Do NOT write generic security advice. Every sentence must reflect the actual scan data provided.
+- Do NOT mention port numbers by number — describe them by service name.
+- urgency_label MUST be exactly: "{urgency_guidance}" (based on risk level {level})
+- compliance_flags: list 3-5 specific LGPD articles, ISO 27001 controls, or NIST CSF references.
+- priority_actions: 3-5 CONCRETE actions specific to the threats found on THIS host. Not generic advice.
+- If no threats were found, say so clearly and give a positive assessment.
 
-Required JSON schema:
+Required JSON schema (fill ALL fields):
 {{
-  "executive_summary": "<2-3 sentence plain-language summary>",
-  "business_impact": "<1-2 sentence business impact statement>",
-  "compliance_flags": ["<regulation/control reference>"],
-  "priority_actions": ["<specific action 1>", "<specific action 2>", "<specific action 3>"],
-  "urgency_label": "<Immediate | This week | This quarter | Monitor>"
+  "executive_summary": "<2-3 sentences, specific to this host and its actual issues>",
+  "business_impact": "<1-2 sentences about concrete business/financial risk from these specific findings>",
+  "compliance_flags": ["<specific regulation + article>", ...],
+  "priority_actions": ["<specific action for this host>", ...],
+  "urgency_label": "{urgency_guidance}"
 }}
 
-Security scan data:
+Complete scan data for host {ip}:
 {json.dumps(scan_data, indent=2, ensure_ascii=False)}
 
 JSON response:"""
@@ -483,22 +516,24 @@ def _parse_llm_response(
 
     
     try:
-    	data = json.loads(clean)
+        data = json.loads(clean)
     except json.JSONDecodeError:
-    # JSON incompleto — tenta fechar automaticamente
-    # Conta chaves abertas e fecha o que falta
-    	open_braces  = clean.count("{") - clean.count("}")
-    	open_brackets = clean.count("[") - clean.count("]")
-    # Fecha listas e objetos abertos
-    if open_brackets > 0:
+        # JSON incompleto — tenta fechar automaticamente
+        open_braces   = clean.count("{") - clean.count("}")
+        open_brackets = clean.count("[") - clean.count("]")
         # Remove última entrada incompleta (sem aspas de fechamento)
-        last_quote = clean.rfind('"')
-        if last_quote > 0:
-            clean = clean[:last_quote] + '"'
-        clean += "]" * open_brackets
-    if open_braces > 0:
-        clean += "}" * open_braces
-    data = json.loads(clean)
+        if open_brackets > 0:
+            last_quote = clean.rfind('"')
+            if last_quote > 0:
+                clean = clean[:last_quote] + '"'
+            clean += "]" * open_brackets
+        if open_braces > 0:
+            clean += "}" * open_braces
+        try:
+            data = json.loads(clean)
+        except json.JSONDecodeError:
+            # Se ainda falhar, levanta para o caller cair no template
+            raise
 
     # Validate urgency_label
     valid_urgency = {"Immediate", "This week", "This quarter", "Monitor"}
@@ -629,39 +664,88 @@ def _translate_via_templates(
     level:     str,
     audience:  str,
 ) -> BusinessReport:
-    """Rule-based fallback — works fully offline, no model required."""
+    """Rule-based fallback — contextualised with real scan data, works fully offline."""
     ip       = host_data.get("ip", "unknown")
     hostname = host_data.get("hostname") or ip
+    os_info  = host_data.get("os", {})
+    os_name  = os_info.get("name", "") if isinstance(os_info, dict) else ""
+    asset_type = host_data.get("asset_type", "host")
     meta     = _LEVEL_META.get(level, _LEVEL_META["MEDIUM"])
 
-    # Executive summary
-    finding_names = [f["name"] for f in findings]
-    if finding_names:
-        threat_list = ", ".join(finding_names[:3])
-        if len(finding_names) > 3:
-            threat_list += f" and {len(finding_names) - 3} other issue(s)"
+    # Gather open ports
+    open_ports = [p for p in host_data.get("ports", []) if p.get("state") == "open"]
+    service_names = [
+        p.get("product") or p.get("service") or f"port {p.get('port')}"
+        for p in open_ports[:5]
+    ]
+
+    # Gather all CVEs across ports
+    all_cves = []
+    for p in open_ports:
+        for cve in p.get("cves", []):
+            all_cves.append((float(cve.get("cvss_score") or 0), cve, p))
+    all_cves.sort(key=lambda x: -x[0])
+    worst_cve_info = ""
+    if all_cves:
+        cvss, cve, port = all_cves[0]
+        svc = port.get("product") or port.get("service") or "a running service"
+        worst_cve_info = (
+            f" The most critical vulnerability ({cve.get('id', 'unknown CVE')}, "
+            f"CVSS {cvss}) affects {svc}."
+        )
+
+    # Executive summary — specific to this host
+    host_ref = f"{hostname} ({ip})" if hostname != ip else ip
+    os_ref   = f" running {os_name}" if os_name else ""
+    services_ref = (
+        f" The host exposes {len(open_ports)} service(s): {', '.join(service_names)}."
+        if service_names else ""
+    )
+
+    if findings:
+        sev_weight = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+        top_findings = sorted(findings, key=lambda f: sev_weight.get(f.get("severity","LOW"), 0), reverse=True)
+        threat_names = [f["name"] for f in top_findings[:3]]
+        threat_str   = ", ".join(threat_names)
+        if len(findings) > 3:
+            threat_str += f" and {len(findings) - 3} additional issue(s)"
+
         summary = (
             f"{meta['summary_prefix']} "
-            f"The system at {hostname} ({ip}) received a risk score of {score}/100. "
-            f"Key issues: {threat_list}."
+            f"The system {host_ref}{os_ref} received a risk score of {score}/100 ({level}).{services_ref} "
+            f"Key threats identified: {threat_str}.{worst_cve_info}"
         )
     else:
         summary = (
-            f"No significant threats detected on {hostname} ({ip}). "
-            f"Risk score: {score}/100."
+            f"No significant threats were detected on {host_ref}{os_ref}. "
+            f"Risk score: {score}/100.{services_ref} "
+            f"Continue monitoring and apply routine patches."
         )
 
-    # Business impact
-    service_count = sum(
-        1 for p in host_data.get("ports", []) if p.get("state") == "open"
-    )
-    impact = (
-        f"{meta['impact_prefix']} "
-        f"With {service_count} accessible service(s), unauthorized access could result in "
-        "data theft, service disruption, or regulatory penalties under LGPD."
-    )
+    # Business impact — use asset type and worst findings
+    top_finding_names = [f["name"] for f in findings[:2]] if findings else []
+    if top_finding_names:
+        finding_ref = " and ".join(top_finding_names)
+        impact = (
+            f"{meta['impact_prefix']} "
+            f"The {asset_type} at {ip} is affected by {finding_ref}. "
+            f"A successful attack could result in data exfiltration, service disruption, "
+            f"or regulatory penalties under LGPD (fines up to 2% of annual revenue)."
+        )
+    elif open_ports:
+        impact = (
+            f"{meta['impact_prefix']} "
+            f"With {len(open_ports)} accessible service(s) on {ip}, "
+            f"the exposure window is open to opportunistic attackers. "
+            f"Unauthorised access could compromise data integrity and business continuity."
+        )
+    else:
+        impact = (
+            f"The host {ip} shows minimal exposure at this time. "
+            f"Maintain current security posture and monitor for changes."
+        )
 
-    # Compliance flags
+    # Compliance flags — deduplicated, specific to findings
     compliance: List[str] = []
     seen_c: set = set()
     for f in findings:
@@ -671,20 +755,41 @@ def _translate_via_templates(
                 compliance.append(flag)
                 seen_c.add(flag)
 
-    # Priority actions
+    # Priority actions — specific to actual findings on this host
     actions: List[str] = []
     seen_a: set = set()
-    for f in findings:
+
+    sev_weight = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+    sorted_findings = sorted(findings, key=lambda f: sev_weight.get(f.get("severity","LOW"), 0), reverse=True)
+
+    for f in sorted_findings:
         pid = f.get("pattern_id") or f.get("id", "")
-        for action in _ACTION_TEMPLATES.get(pid, [])[:2]:
+        # Use the remediation list from the finding itself if available
+        finding_remediations = f.get("remediation", [])
+        template_actions     = _ACTION_TEMPLATES.get(pid, [])
+        source = finding_remediations[:2] or template_actions[:2]
+        for action in source:
             if action not in seen_a:
-                actions.append(action)
+                # Make action host-specific
+                host_specific = action.replace("the system", f"{ip}").replace("this system", f"{ip}")
+                actions.append(host_specific)
                 seen_a.add(action)
         if len(actions) >= 5:
             break
 
+    # Add CVE-specific action if worst CVE is severe
+    if all_cves and all_cves[0][0] >= 7.0:
+        cvss, cve, port = all_cves[0]
+        svc = port.get("product") or port.get("service") or "affected service"
+        cve_action = f"Patch {svc} immediately — {cve.get('id','unknown CVE')} (CVSS {cvss}) has a known exploit vector"
+        if cve_action not in seen_a and len(actions) < 5:
+            actions.append(cve_action)
+
     if not actions:
-        actions = ["Schedule a follow-up security assessment to verify system configuration."]
+        actions = [
+            f"Schedule a follow-up security assessment for {ip} to verify configuration.",
+            "Keep all services patched to their latest stable versions.",
+        ]
 
     return BusinessReport(
         ip=ip,
