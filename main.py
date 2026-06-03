@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Munin — Cyber Risk Intelligence Platform
+# Munin — Network Reconnaissance & Threat Analysis Framework
 # Copyright (C) 2026 Plinio Lima
 #
 # This program is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 """
-Munin — Cyber Risk Intelligence Platform
+Munin — Network Reconnaissance & Vulnerability Assessment Framework
 """
 
 import os
@@ -117,6 +117,7 @@ HELP_TEXT = """\
 
   [cyan]compliance[/cyan]                  Postura de compliance (ISO 27001 / NIST / CIS / LGPD)
   [cyan]remediation[/cyan]                 Plano de remediação priorizado
+  [cyan]assets[/cyan]                      Classificação de criticidade dos ativos
   [cyan]history[/cyan]                     Histórico de scans e tendências
 
 [bold cyan]Exportação[/bold cyan]
@@ -167,9 +168,9 @@ HELP_TEXT = """\
 def check_root() -> bool:
     if os.geteuid() != 0:
         console.print(
-            "[yellow]AVISO  Munin requer root / sudo para:\n"
-            "         Scan ARP, fingerprint de OS (-O), SYN scan (-sS)\n"
-            "         Execute:  sudo python main.py[/yellow]"
+            "[yellow]WARNING  Munin requires root / sudo for:\n"
+            "         ARP scan, OS fingerprinting (-O), SYN scan (-sS)\n"
+            "         Run:  sudo python main.py[/yellow]"
         )
         return False
     return True
@@ -308,7 +309,7 @@ def run_full_network_scan(target: str, profile: str, do_cve: bool, do_nse: bool,
     }
 
     console.print()
-    console.rule("[cyan]Fase 1 — Descoberta[/cyan]")
+    console.rule("[cyan]Phase 1 — Discovery[/cyan]")
 
     with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
                   TimeElapsedColumn(), console=console, transient=True) as prog:
@@ -316,17 +317,17 @@ def run_full_network_scan(target: str, profile: str, do_cve: bool, do_nse: bool,
         discovered = arp_scan(target)
 
     if not discovered:
-        console.print("[yellow]Nenhum host encontrado.[/yellow]")
+        console.print("[yellow]No hosts found.[/yellow]")
         return result
 
-    console.print(f"[green]  {len(discovered)} hosts encontrados[/green]")
+    console.print(f"[green]  {len(discovered)} hosts found[/green]")
     console.print()
-    console.rule("[cyan]Fase 2 — Análise de Hosts[/cyan]")
+    console.rule("[cyan]Phase 2 — Host Analysis[/cyan]")
 
     with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
                   BarColumn(), TextColumn("{task.completed}/{task.total}"),
                   console=console) as prog:
-        task = prog.add_task("Escaneando hosts...", total=len(discovered))
+        task = prog.add_task("Scanning hosts...", total=len(discovered))
         for entry in discovered:
             ip  = entry["ip"]
             mac = entry.get("mac", "N/A")
@@ -346,7 +347,7 @@ def run_single_host_scan(ip: str, profile: str, do_cve: bool, do_nse: bool,
                          do_criticality: bool = True) -> dict:
     start = time.time()
     console.print()
-    console.rule(f"[cyan]Escaneando {ip}[/cyan]")
+    console.rule(f"[cyan]Scanning {ip}[/cyan]")
 
     host = _scan_single_host(ip, profile, do_cve, do_nse,
                              audience=audience, do_criticality=do_criticality)
@@ -366,7 +367,7 @@ def run_single_host_scan(ip: str, profile: str, do_cve: bool, do_nse: bool,
 def run_discovery_only(target: str) -> dict:
     start = time.time()
     console.print()
-    console.rule("[cyan]Descoberta ARP[/cyan]")
+    console.rule("[cyan]ARP Discovery[/cyan]")
 
     with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
                   TimeElapsedColumn(), console=console, transient=True) as prog:
@@ -374,14 +375,14 @@ def run_discovery_only(target: str) -> dict:
         discovered = arp_scan(target)
 
     if not discovered:
-        console.print("[yellow]Nenhum host encontrado.[/yellow]")
+        console.print("[yellow]No hosts found.[/yellow]")
         return {"meta": {}, "hosts": []}
 
     hosts = []
     with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
                   BarColumn(), TextColumn("{task.completed}/{task.total}"),
                   console=console) as prog:
-        task = prog.add_task("Resolvendo hostnames e fabricantes...", total=len(discovered))
+        task = prog.add_task("Resolving hostnames & vendors...", total=len(discovered))
         for entry in discovered:
             ip  = entry["ip"]
             mac = entry.get("mac", "N/A")
@@ -418,7 +419,7 @@ def run_discovery_only(target: str) -> dict:
         t.add_row(h["ip"], h["mac"], h["mac_vendor"], h["hostname"])
     console.print(t)
     console.print(
-        f"[green]  {len(hosts)} hosts encontrados em "
+        f"[green]  {len(hosts)} hosts found in "
         f"{result['meta']['scan_duration']}s[/green]"
     )
     return result
@@ -446,11 +447,11 @@ def _print_business_reports(result: dict, audience: str = "manager") -> None:
     """Print plain-language business reports for all hosts in a result."""
     hosts = result.get("hosts", [])
     if not hosts:
-        console.print("[yellow]Nenhum host para reportar.[/yellow]")
+        console.print("[yellow]No hosts to report.[/yellow]")
         return
 
     console.print()
-    console.rule(f"[cyan]Relatório Executivo — audiência: {audience}[/cyan]")
+    console.rule(f"[cyan]Business Report — audience: {audience}[/cyan]")
 
     for host in hosts:
         # Use cached report if available and audience matches
@@ -500,26 +501,26 @@ def _render_business_report_dict(report: dict) -> None:
 
     summary = report.get("executive_summary", "")
     if summary:
-        console.print(f"  [bold]Resumo Executivo[/bold]")
+        console.print(f"  [bold]Summary[/bold]")
         console.print(f"  {summary}")
         console.print()
 
     impact = report.get("business_impact", "")
     if impact:
-        console.print(f"  [bold]Impacto de Negócio[/bold]")
+        console.print(f"  [bold]Business Impact[/bold]")
         console.print(f"  {impact}")
         console.print()
 
     flags = report.get("compliance_flags", [])
     if flags:
-        console.print(f"  [bold]Flags de Conformidade[/bold]")
+        console.print(f"  [bold]Compliance Flags[/bold]")
         for flag in flags:
             console.print(f"  [dim]•[/dim] {flag}")
         console.print()
 
     actions = report.get("priority_actions", [])
     if actions:
-        console.print(f"  [bold]Ações Prioritárias[/bold]")
+        console.print(f"  [bold]Priority Actions[/bold]")
         for i, action in enumerate(actions, 1):
             console.print(f"  [cyan]{i}.[/cyan] {action}")
 
@@ -533,9 +534,9 @@ def _save_business_report_md(result: dict, audience: str) -> Path:
     path = Path(f"munin_report_{audience}_{ts}.md")
 
     lines = [
-        f"# Munin — Relatório Executivo ({audience.capitalize()})",
-        f"Gerado em: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"Alvo: {result.get('meta', {}).get('target', 'unknown')}",
+        f"# Munin Business Report — {audience.capitalize()}",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Target: {result.get('meta', {}).get('target', 'unknown')}",
         "",
     ]
 
@@ -563,25 +564,25 @@ def _save_business_report_md(result: dict, audience: str) -> Path:
 
         lines += [
             f"## {ip}  —  {level} ({score}/100)",
-            f"**Urgência:** {urgency}",
+            f"**Urgency:** {urgency}",
             "",
-            "### Resumo Executivo",
+            "### Summary",
             report_dict.get("executive_summary", ""),
             "",
-            "### Impacto de Negócio",
+            "### Business Impact",
             report_dict.get("business_impact", ""),
             "",
         ]
 
         flags = report_dict.get("compliance_flags", [])
         if flags:
-            lines += ["### Flags de Conformidade"]
+            lines += ["### Compliance Flags"]
             lines += [f"- {f}" for f in flags]
             lines += [""]
 
         actions = report_dict.get("priority_actions", [])
         if actions:
-            lines += ["### Ações Prioritárias"]
+            lines += ["### Priority Actions"]
             lines += [f"{i+1}. {a}" for i, a in enumerate(actions)]
             lines += [""]
 
@@ -596,18 +597,18 @@ def save_and_report(result: dict, s: "Settings") -> None:
         return
 
     console.print()
-    console.rule("[cyan]Resultados[/cyan]")
+    console.rule("[cyan]Results[/cyan]")
     print_all(result)
 
     # Always save JSON and history snapshot automatically
     p = _save_json(result)
-    console.print(f"[green]  JSON salvo: {p.resolve()}[/green]")
+    console.print(f"[green]  JSON saved: {p.resolve()}[/green]")
 
     # ── NLP business report ──────────────────────────────────────────────────
-    ans_nlp = _ask("Gerar relatório executivo em linguagem natural? [s/N]: ").strip().lower()
+    ans_nlp = _ask("Generate plain-language business report? [y/N]: ").strip().lower()
     if ans_nlp in ("y", "yes"):
         audience_input = _ask(
-            f"Audiência [manager/auditor/board] (Enter = {s.audience}): "
+            f"Audience [manager/auditor/board] (Enter = {s.audience}): "
         ).strip().lower()
         audience = (
             audience_input
@@ -616,13 +617,13 @@ def save_and_report(result: dict, s: "Settings") -> None:
         )
         _print_business_reports(result, audience)
 
-        ans_md = _ask("Salvar relatório como Markdown? [s/N]: ").strip().lower()
+        ans_md = _ask("Save business report as Markdown? [y/N]: ").strip().lower()
         if ans_md in ("y", "yes"):
             p = _save_business_report_md(result, audience)
-            console.print(f"[green]  Markdown salvo: {p.resolve()}[/green]")
+            console.print(f"[green]  Markdown saved: {p.resolve()}[/green]")
 
     # ── PDF report ───────────────────────────────────────────────────────────
-    ans_pdf = _ask("Gerar relatório PDF executivo? [s/N]: ").strip().lower()
+    ans_pdf = _ask("Generate PDF executive report? [y/N]: ").strip().lower()
     if ans_pdf in ("y", "yes"):
         try:
             from report.pdf_report import generate_pdf
@@ -635,7 +636,7 @@ def save_and_report(result: dict, s: "Settings") -> None:
             Path("reports").mkdir(exist_ok=True)
             out = generate_pdf(result, output_path=out_p,
                                audience=s.audience, env_compliance=env_cs)
-            console.print(f"[green]  PDF salvo: {out.resolve()}[/green]")
+            console.print(f"[green]  PDF saved: {out.resolve()}[/green]")
         except Exception as exc:
             console.print(f"[red]  PDF failed: {exc}[/red]")
 
@@ -647,7 +648,7 @@ def save_and_report(result: dict, s: "Settings") -> None:
 def cmd_readlog(path_str: str) -> None:
     """Parse a log file, render a Rich table, run threat correlation, offer .md export."""
     console.print()
-    console.rule(f"[cyan]Leitor de Log — {path_str}[/cyan]")
+    console.rule(f"[cyan]Log Reader — {path_str}[/cyan]")
 
     try:
         log_type, entries = read_log(path_str)
@@ -660,8 +661,8 @@ def cmd_readlog(path_str: str) -> None:
         return
 
     console.print(
-        f"[dim]  Formato detectado: [cyan]{log_type}[/cyan]  "
-        f"({len(entries)} entradas)[/dim]\n"
+        f"[dim]  Detected format: [cyan]{log_type}[/cyan]  "
+        f"({len(entries)} entries)[/dim]\n"
     )
 
     columns = list(entries[0].keys())
@@ -711,14 +712,14 @@ def cmd_readlog(path_str: str) -> None:
 
     console.print(t)
     console.print(
-        f"\n[dim]  Exibindo {len(entries)} entradas de "
+        f"\n[dim]  Showing {len(entries)} log entries from "
         f"[cyan]{Path(path_str).name}[/cyan][/dim]"
     )
 
     _run_log_correlation(entries, log_type)
 
-    ans = _ask("\nExportar tabela para arquivo Markdown? [s/N]: ").strip().lower()
-    if ans in ("y", "yes", "s", "sim"):
+    ans = _ask("\nExport table to Markdown file? [y/N]: ").strip().lower()
+    if ans in ("y", "yes"):
         _export_log_md(columns, entries, path_str)
 
 
@@ -743,14 +744,14 @@ def _run_log_correlation(entries: list, log_type: str) -> None:
     findings = correlate(host_data, all_hosts=None)
     if not findings:
         console.print(
-            "\n[dim green]  Nenhuma ameaça detectada neste arquivo de log.[/dim green]\n"
+            "\n[dim green]  No threats detected in this log file.[/dim green]\n"
         )
         return
 
     score, level = smart_risk([], {}, findings)
 
     console.print()
-    console.rule("[bold yellow]Análise de Ameaças no Log[/bold yellow]")
+    console.rule("[bold yellow]Log Threat Analysis[/bold yellow]")
     print_findings(findings, score, level)
 
 
@@ -799,8 +800,8 @@ def cmd_correlate(ip: str, log_path: str, last_result: dict) -> None:
 
     if not host:
         console.print(
-            f"[yellow]Host {ip} não encontrado no último scan. "
-            f"Execute 'scan host {ip}' primeiro.[/yellow]"
+            f"[yellow]Host {ip} not found in last scan result. "
+            f"Run 'scan host {ip}' first.[/yellow]"
         )
         return
 
@@ -814,7 +815,7 @@ def cmd_correlate(ip: str, log_path: str, last_result: dict) -> None:
         return
 
     console.print(
-        f"[dim]  Formato do log: [cyan]{log_type}[/cyan]  ({len(entries)} entradas)[/dim]"
+        f"[dim]  Log format: [cyan]{log_type}[/cyan]  ({len(entries)} entries)[/dim]"
     )
 
     host["logs"]     = entries
@@ -830,7 +831,7 @@ def cmd_correlate(ip: str, log_path: str, last_result: dict) -> None:
 
     if not host["findings"]:
         console.print(
-            "[dim green]  Nenhuma ameaça adicional detectada após correlação de log.[/dim green]\n"
+            "[dim green]  No additional threats detected after log correlation.[/dim green]\n"
         )
 
 
@@ -928,21 +929,57 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
         color = "green" if s.do_criticality else "yellow"
         console.print(f"[{color}]  asset criticality => {state}[/{color}]")
 
-    # ── set audience <nome> ── v2 ────────────────────────────────────────────
-    elif cmd == "set" and len(parts) >= 3 and parts[1] == "audience":
+    # ── assets ── v2 ─────────────────────────────────────────────────────────
+    elif cmd == "assets":
+        if not last_result.get("hosts"):
+            console.print("[yellow]No scan result. Run a scan first.[/yellow]")
+        else:
+            try:
+                from scanner.analysis.asset_criticality import classify_asset, apply_criticality_to_risk
+                hosts = last_result.get("hosts", [])
+                console.print()
+                console.rule("[cyan]Asset Criticality Classification[/cyan]")
+                t = Table(box=box.SIMPLE_HEAD, border_style="dim", header_style="bold cyan", padding=(0,1))
+                t.add_column("IP",           style="cyan", width=16)
+                t.add_column("Asset Type",   width=22)
+                t.add_column("Criticality",  width=12)
+                t.add_column("Confidence",   width=10)
+                t.add_column("Risk Score",   width=12)
+                t.add_column("Reason",       style="dim", width=40)
+                crit_color = {"CRITICAL":"bold red","HIGH":"red","MEDIUM":"yellow","LOW":"green"}
+                for h in sorted(hosts, key=lambda x: x.get("risk_score",0), reverse=True):
+                    ap   = h.get("asset_profile", {})
+                    atype = h.get("asset_type", ap.get("asset_type", "unknown"))
+                    crit  = h.get("asset_criticality", ap.get("criticality", "MEDIUM"))
+                    cc    = crit_color.get(crit, "white")
+                    raw   = h.get("risk_score_raw", h.get("risk_score", 0))
+                    adj   = h.get("risk_score", 0)
+                    score_str = f"{raw}→{adj}" if raw != adj else str(adj)
+                    reason = (ap.get("type_reason") or "heuristic")[:38]
+                    t.add_row(
+                        h.get("ip","?"),
+                        atype,
+                        f"[{cc}]{crit}[/{cc}]",
+                        ap.get("confidence","low"),
+                        score_str,
+                        reason,
+                    )
+                console.print(t)
+            except Exception as exc:
+                console.print(f"[red]  Assets error: {exc}[/red]")
         val = parts[2].lower()
         if val in ("manager", "auditor", "board"):
             s.audience = val
-            console.print(f"[green]  audiência NLP => {val}[/green]")
+            console.print(f"[green]  nlp audience => {val}[/green]")
         else:
-            console.print("[red]Uso: set audience <manager|auditor|board>[/red]")
+            console.print("[red]Usage: set audience <manager|auditor|board>[/red]")
 
     # ── scan net <CIDR> ──────────────────────────────────────────────────────
     elif cmd == "scan" and len(parts) >= 3 and parts[1] == "net":
         target = parts[2]
         s.show()
-        ans = _ask(f"\nIniciar scan completo em {target}? [s/N]: ").strip().lower()
-        if ans in ("y", "yes", "s", "sim"):
+        ans = _ask(f"\nStart full scan on {target}? [y/N]: ").strip().lower()
+        if ans in ("y", "yes"):
             last_result = run_full_network_scan(
                 target, s.profile, s.do_cve, s.do_nse,
                 audience=s.audience, do_criticality=s.do_criticality
@@ -955,8 +992,8 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     elif cmd == "scan" and len(parts) >= 3 and parts[1] == "host":
         ip = parts[2]
         s.show()
-        ans = _ask(f"\nIniciar scan em {ip}? [s/N]: ").strip().lower()
-        if ans in ("y", "yes", "s", "sim"):
+        ans = _ask(f"\nStart scan on {ip}? [y/N]: ").strip().lower()
+        if ans in ("y", "yes"):
             last_result = run_single_host_scan(
                 ip, s.profile, s.do_cve, s.do_nse,
                 audience=s.audience, do_criticality=s.do_criticality
@@ -989,10 +1026,10 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     # ── export report ── v2 ───────────────────────────────────────────────────
     elif cmd == "export" and len(parts) >= 2 and parts[1] == "report":
         if not last_result.get("hosts"):
-            console.print("[yellow]Nenhum resultado em memória. Execute um scan primeiro.[/yellow]")
+            console.print("[yellow]No scan result in memory. Run a scan first.[/yellow]")
         else:
             audience_input = _ask(
-                f"Audiência [manager/auditor/board] (Enter = {s.audience}): "
+                f"Audience [manager/auditor/board] (Enter = {s.audience}): "
             ).strip().lower()
             audience = (
                 audience_input
@@ -1000,10 +1037,10 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
                 else s.audience
             )
             _print_business_reports(last_result, audience)
-            ans_md = _ask("Salvar como Markdown? [s/N]: ").strip().lower()
+            ans_md = _ask("Save as Markdown? [y/N]: ").strip().lower()
             if ans_md in ("y", "yes"):
                 p = _save_business_report_md(last_result, audience)
-                console.print(f"[green]  Markdown salvo: {p.resolve()}[/green]")
+                console.print(f"[green]  Markdown saved: {p.resolve()}[/green]")
 
     # ── load <json_path> ─────────────────────────────────────────────────────
     elif cmd == "load":
@@ -1041,14 +1078,14 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     # ── compliance ─────────────────────────────────────────────────────────────
     elif cmd == "compliance":
         if not last_result.get("hosts"):
-            console.print("[yellow]Nenhum resultado de scan. Execute um scan primeiro.[/yellow]")
+            console.print("[yellow]No scan result. Run a scan first.[/yellow]")
         else:
             try:
                 from scanner.analysis.compliance_mapper import environment_compliance_score
                 hosts  = last_result.get("hosts", [])
                 env_cs = environment_compliance_score(hosts)
                 console.print()
-                console.rule("[cyan]Postura de Conformidade[/cyan]")
+                console.rule("[cyan]Compliance Posture[/cyan]")
                 t = Table(box=box.SIMPLE, show_header=False, padding=(0,2))
                 t.add_column("framework", style="cyan", width=22)
                 t.add_column("score", style="white")
@@ -1069,12 +1106,12 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     # ── remediation ────────────────────────────────────────────────────────────
     elif cmd == "remediation":
         if not last_result.get("hosts"):
-            console.print("[yellow]Nenhum resultado de scan. Execute um scan primeiro.[/yellow]")
+            console.print("[yellow]No scan result. Run a scan first.[/yellow]")
         else:
             try:
                 plans = prioritize_environment(last_result.get("hosts",[]))
                 console.print()
-                console.rule("[cyan]Priorização de Remediação[/cyan]")
+                console.rule("[cyan]Remediation Prioritization[/cyan]")
                 t = Table(box=box.SIMPLE_HEAD, border_style="dim", header_style="bold cyan", padding=(0,1))
                 t.add_column("IP",        style="cyan", width=16)
                 t.add_column("Priority",  width=12)
@@ -1105,12 +1142,12 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
                 )
             else:
                 console.print()
-                console.rule("[cyan]Histórico de Scans[/cyan]")
+                console.rule("[cyan]Scan History[/cyan]")
                 t = Table(box=box.SIMPLE_HEAD, border_style="dim", header_style="bold cyan", padding=(0,1))
                 t.add_column("Scan",     width=18)
-                t.add_column("Alvo",     width=20)
+                t.add_column("Target",   width=20)
                 t.add_column("Hosts",    width=7)
-                t.add_column("Risco Méd.", width=10)
+                t.add_column("Avg Risk", width=10)
                 t.add_column("CVEs",     width=7)
                 for s2 in reversed(snaps[-8:]):
                     t.add_row(s2.scan_time[:16], s2.target, str(s2.host_count),
@@ -1130,7 +1167,7 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
     # ── export pdf ─────────────────────────────────────────────────────────────
     elif cmd == "export" and len(parts) >= 2 and parts[1] == "pdf":
         if not last_result.get("hosts"):
-            console.print("[yellow]Nenhum resultado de scan. Execute um scan primeiro.[/yellow]")
+            console.print("[yellow]No scan result. Run a scan first.[/yellow]")
         else:
             try:
                 from report.pdf_report import generate_pdf
@@ -1143,21 +1180,21 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
                 import pathlib; pathlib.Path("reports").mkdir(exist_ok=True)
                 out    = generate_pdf(last_result, output_path=out_p,
                                       audience=s.audience, env_compliance=env_cs)
-                console.print(f"[green]  Relatório salvo: {out}[/green]")
+                console.print(f"[green]  Report saved: {out}[/green]")
             except Exception as exc:
                 console.print(f"[red]  PDF export failed: {exc}[/red]")
 
     # ── export siem ────────────────────────────────────────────────────────────
     elif cmd == "export" and len(parts) >= 2 and parts[1] == "siem":
         if not last_result.get("hosts"):
-            console.print("[yellow]Nenhum resultado de scan. Execute um scan primeiro.[/yellow]")
+            console.print("[yellow]No scan result. Run a scan first.[/yellow]")
         else:
             try:
                 from scanner.analysis.siem_connector import send_findings, list_configured
                 connector = parts[2] if len(parts) >= 3 else "auto"
                 configured = list_configured()
                 if not configured:
-                    console.print("[yellow]  Nenhum conector SIEM configurado. Configure as variáveis MUNIN_SIEM_*.[/yellow]")
+                    console.print("[yellow]  No SIEM connectors configured. Set MUNIN_SIEM_* env vars.[/yellow]")
                 else:
                     results = send_findings(last_result, connector)
                     for r in results:
@@ -1171,14 +1208,14 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
 
     # ── exit / quit ──────────────────────────────────────────────────────────
     elif cmd in ("exit", "quit"):
-        console.print("\n[dim]Até logo.[/dim]\n")
+        console.print("\n[dim]Goodbye.[/dim]\n")
         sys.exit(0)
 
     # ── unknown ──────────────────────────────────────────────────────────────
     else:
         console.print(
-            f"[red]Comando desconhecido: '{line}'[/red]  "
-            f"Digite [cyan]help[/cyan] para ver os comandos disponíveis."
+            f"[red]Unknown command: '{line}'[/red]  "
+            f"Type [cyan]help[/cyan] for available commands."
         )
 
     return last_result
@@ -1197,11 +1234,11 @@ def main() -> None:
     console.print(BANNER.format(version=VERSION))
     console.print(
         f"[dim]  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  "
-        f"Digite [cyan]help[/cyan] para listar os comandos.[/dim]\n"
+        f"Type [cyan]help[/cyan] to list all commands.[/dim]\n"
     )
 
     if not check_root():
-        ans = _ask("Continuar sem root? (funcionalidades limitadas) [s/N]: ").strip().lower()
+        ans = _ask("Continue without root? (limited features) [y/N]: ").strip().lower()
         if ans not in ("y", "yes"):
             sys.exit(0)
         console.print()
@@ -1233,7 +1270,7 @@ def main() -> None:
         try:
             line = input("munin > ").strip()
         except (EOFError, KeyboardInterrupt):
-            console.print("\n[dim]Até logo.[/dim]\n")
+            console.print("\n[dim]Goodbye.[/dim]\n")
             sys.exit(0)
 
         if not line:
