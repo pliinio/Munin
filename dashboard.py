@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Munin — Cyber Risk Intelligence Platform
+# Munin — Network Reconnaissance & Threat Analysis Framework
 # Copyright (C) 2026 Plinio Lima
 #
 # This program is free software: you can redistribute it and/or modify
@@ -375,7 +375,7 @@ NAV_HTML = """
   <a class="nav-logo" href="/">
     {raven}
     <span class="nav-title">MUNIN</span>
-    <span class="nav-sub">Painel GRC</span>
+    <span class="nav-sub">GRC Dashboard</span>
   </a>
   <div class="nav-right">
     <span class="nav-badge">v1.2.0</span>
@@ -383,7 +383,7 @@ NAV_HTML = """
     <span class="nav-badge">{target}</span>
   </div>
 </nav>
-""".replace("{raven}", RAVEN_IMG)
+""".replace("{raven}", RAVEN_SVG)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -410,10 +410,10 @@ def _score_bar(score: int, level: str) -> str:
 
 def _urgency_badge(label: str) -> str:
     colors = {
-        "Imediato":    ("#ef4444", "rgba(239,68,68,.15)"),
-        "Esta semana":    ("#f97316", "rgba(249,115,22,.15)"),
-        "Este trimestre": ("#eab308", "rgba(234,179,8,.15)"),
-        "Monitorar":      ("#22c55e", "rgba(34,197,94,.15)"),
+        "Immediate":    ("#ef4444", "rgba(239,68,68,.15)"),
+        "This week":    ("#f97316", "rgba(249,115,22,.15)"),
+        "This quarter": ("#eab308", "rgba(234,179,8,.15)"),
+        "Monitor":      ("#22c55e", "rgba(34,197,94,.15)"),
     }
     c, bg = colors.get(label, ("#9ca3af", "rgba(156,163,175,.15)"))
     return (
@@ -465,10 +465,10 @@ def index():
     # ── Metric cards ──────────────────────────────────────────────────────────
     metrics_html = ""
     metrics_data = [
-        ("Hosts",         str(total_hosts),    "escaneados"),
-        ("Portas Abertas", str(open_ports),     "total"),
-        ("CVEs Encontrados", str(total_cves),   "em todos os hosts"),
-        ("Ameaças",       str(total_findings),  "detectadas"),
+        ("Hosts",         str(total_hosts),    "scanned"),
+        ("Open Ports",    str(open_ports),      "total"),
+        ("CVEs Found",    str(total_cves),      "across all hosts"),
+        ("Threats",       str(total_findings),  "detected"),
     ]
     for label, value, sub in metrics_data:
         metrics_html += f"""
@@ -543,17 +543,17 @@ def index():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Munin — Painel GRC</title>
+  <title>Munin GRC Dashboard</title>
   {BASE_STYLE}
 </head>
 <body>
   {nav}
   <div class="container">
-    <div class="page-title">Painel Executivo de Segurança</div>
+    <div class="page-title">Executive Security Dashboard</div>
     <div class="page-sub">
-      Scan concluído em {meta.get("scan_duration", 0):.1f}s &nbsp;·&nbsp;
-      Perfil: {meta.get("scan_profile", "N/A")} &nbsp;·&nbsp;
-      {total_hosts} host{"s" if total_hosts != 1 else ""} analisado{"s" if total_hosts != 1 else ""}
+      Scan completed in {meta.get("scan_duration", 0):.1f}s &nbsp;·&nbsp;
+      Profile: {meta.get("scan_profile", "N/A")} &nbsp;·&nbsp;
+      {total_hosts} host{"s" if total_hosts != 1 else ""} analysed
     </div>
 
     <div class="metric-grid">{metrics_html}</div>
@@ -561,8 +561,8 @@ def index():
     <div style="display:grid;grid-template-columns:1fr 240px;gap:1.2rem;margin-bottom:2rem">
       <div class="card">
         <div class="card-header">
-          {RAVEN_IMG.replace('style="width:36px;height:36px;object-fit:contain;"', 'style="width:18px;height:18px;object-fit:contain;vertical-align:middle"')}
-          Visão Geral de Risco dos Hosts
+          {RAVEN_SVG.replace('viewBox="0 0 200 200"', 'viewBox="0 0 200 200" style="width:18px;height:18px"')}
+          Host Risk Overview
         </div>
         {host_rows_html}
       </div>
@@ -577,7 +577,7 @@ def index():
     </div>
 
     <div style="font-size:11px;color:var(--muted);text-align:center;padding:2rem 0">
-      Munin Painel GRC · Clique em qualquer host para o relatório completo · {meta.get("scan_time", "")}
+      Munin GRC Dashboard · Click any host for the full report · {meta.get("scan_time", "")}
     </div>
   </div>
 
