@@ -395,7 +395,7 @@ NAV_HTML = """
     <span class="nav-badge">{target}</span>
   </div>
 </nav>
-""".replace("{raven}", RAVEN_SVG)
+""".replace("{raven}", RAVEN_IMG)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -600,7 +600,7 @@ def index():
     <div style="display:grid;grid-template-columns:1fr 240px;gap:1.2rem;margin-bottom:2rem">
       <div class="card">
         <div class="card-header">
-          {RAVEN_SVG.replace('viewBox="0 0 200 200"', 'viewBox="0 0 200 200" style="width:18px;height:18px"')}
+          {RAVEN_IMG.replace('viewBox="0 0 200 200"', 'viewBox="0 0 200 200" style="width:18px;height:18px"')}
           Host Risk Overview
         </div>
         {host_rows_html}
