@@ -967,6 +967,9 @@ def dispatch(line: str, s: Settings, last_result: dict) -> dict:
                 console.print(t)
             except Exception as exc:
                 console.print(f"[red]  Assets error: {exc}[/red]")
+
+    # ── set audience manager|auditor|board ───────────────────────────────────
+    elif cmd == "set" and len(parts) >= 3 and parts[1] == "audience":
         val = parts[2].lower()
         if val in ("manager", "auditor", "board"):
             s.audience = val
