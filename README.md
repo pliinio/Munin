@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="License: AGPL-3.0"/>
     <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey?style=flat-square" alt="Platform"/>
     <img src="https://img.shields.io/badge/requires-root%20%2F%20sudo-critical?style=flat-square" alt="Requires root"/>
-    <img src="https://img.shields.io/badge/version-2.0.3-brightgreen?style=flat-square" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-2.1.0-brightgreen?style=flat-square" alt="Version"/>
   </p>
 
   <p><em>"O diferencial do Munin não é detectar vulnerabilidades.<br>É explicar, priorizar e contextualizar riscos de forma compreensível para humanos."</em></p>
@@ -583,7 +583,7 @@ Se não funcionar, o Munin gera automaticamente um `.html` como fallback.
 
 ### `history` não mostra scans
 
-Os snapshots de histórico são criados automaticamente quando um scan é concluído e o JSON é salvo em `scans/`. Se você tiver JSONs antigos salvos na raiz do projeto (antes da v2.0.3), carregue-os com `load` para registrá-los no histórico:
+Os snapshots de histórico são criados automaticamente quando um scan é concluído e o JSON é salvo em `scans/`. Se você tiver JSONs antigos salvos na raiz do projeto (antes da v2.1.0), carregue-os com `load` para registrá-los no histórico:
 ```bash
 munin > load munin_20260529_102738.json
 ```
